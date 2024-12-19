@@ -4,6 +4,10 @@ let gl;                         // The webgl context.
 let surface;                    // A surface model
 let shProgram;                  // A shader program
 let spaceball;                  // A SimpleRotator object that lets the user rotate the view by mouse.
+let surfaceU;
+let surfaceV;
+
+const { cos, sin, sqrt, pow, PI } = Math
 
 function deg2rad(angle) {
     return angle * Math.PI / 180;
@@ -58,60 +62,96 @@ function ShaderProgram(name, program) {
  * (Note that the use of the above drawPrimitive function is not an efficient
  * way to draw with WebGL.  Here, the geometry is so simple that it doesn't matter.)
  */
-function draw() { 
-    gl.clearColor(0,0,0,1);
+function draw() {
+    gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    
-    /* Set the values of the projection transformation */
-    let projection = m4.perspective(Math.PI/8, 1, 8, 12); 
-    
-    /* Get the view matrix from the SimpleRotator object.*/
+
+    let projection = m4.perspective(Math.PI / 8, 1, 8, 12);
     let modelView = spaceball.getViewMatrix();
 
-    let rotateToPointZero = m4.axisRotation([0.707,0.707,0], 0.7);
-    let translateToPointZero = m4.translation(0,0,-10);
+    let rotateToPointZero = m4.axisRotation([0.707, 0.707, 0], 0.7);
+    let translateToPointZero = m4.translation(0, 0, -10);
 
-    let matAccum0 = m4.multiply(rotateToPointZero, modelView );
-    let matAccum1 = m4.multiply(translateToPointZero, matAccum0 );
-        
-    /* Multiply the projection matrix times the modelview matrix to give the
-       combined transformation matrix, and send that to the shader program. */
-    let modelViewProjection = m4.multiply(projection, matAccum1 );
+    let matAccum0 = m4.multiply(rotateToPointZero, modelView);
+    let matAccum1 = m4.multiply(translateToPointZero, matAccum0);
 
-    gl.uniformMatrix4fv(shProgram.iModelViewProjectionMatrix, false, modelViewProjection );
-    
-    /* Draw the six faces of a cube, with different colors. */
-    gl.uniform4fv(shProgram.iColor, [1,1,0,1] );
+    let modelViewProjection = m4.multiply(projection, matAccum1);
 
-    surface.Draw();
+    gl.uniformMatrix4fv(shProgram.iModelViewProjectionMatrix, false, modelViewProjection);
+
+    // Draw U lines
+    gl.uniform4fv(shProgram.iColor, [0, 1, 0, 1]);
+    surfaceU.Draw();
+
+    // Draw V lines
+    gl.uniform4fv(shProgram.iColor, [0, 1, 0, 1]);
+    surfaceV.Draw();
 }
 
-// function CreateSurfaceData()
-// {
-//     let vertexList = [];
+function CreateSurfaceData() {
+    let uVertexList = [];
+    let vVertexList = [];
 
-//     for (let i=0; i<360; i+=5) {
-//         vertexList.push( Math.sin(deg2rad(i)), 1, Math.cos(deg2rad(i)) );
-//         vertexList.push( Math.sin(deg2rad(i)), 0, Math.cos(deg2rad(i)) );
-//     }
+    const NUM_STEPS_BETA = 30,
+        NUM_STEPS_Z = 60,
+        MAX_BETA = PI * 2,
+        MAX_Z = 20,
+        STEP_BETA = MAX_BETA / NUM_STEPS_BETA,
+        STEP_Z = MAX_Z / NUM_STEPS_Z;
 
-//     return vertexList;
-// }
+    // Generate U lines (fixed z, varying beta)
+    for (let z = 1; z < MAX_Z; z += STEP_Z) {
+        for (let beta = 0; beta <= MAX_BETA; beta += STEP_BETA) {
+            let vertex = pearVertex(z, beta);
+            uVertexList.push(...vertex);
+        }
+    }
 
+    // Generate V lines (fixed beta, varying z)
+    for (let beta = 0; beta < MAX_BETA; beta += STEP_BETA) {
+        for (let z = 1; z <= MAX_Z; z += STEP_Z) {
+            let vertex = pearVertex(z, beta);
+            vVertexList.push(...vertex);
+        }
+    }
+
+    return { uVertexList, vVertexList };
+}
+
+const a = 20
+const b = 20
+const scaler = 0.1;
+
+function r(z) {
+    return z * sqrt(z * (a - z)) / b
+}
+
+function pearVertex(z, beta) {
+    console.log(r(z))
+    let x = r(z) * sin(beta),
+        y = r(z) * cos(beta),
+        cZ = z;
+    return [scaler * x, scaler * y, scaler * cZ];
+}
 
 /* Initialize the WebGL context. Called from init() */
 function initGL() {
-    let prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+    let prog = createProgram(gl, vertexShaderSource, fragmentShaderSource);
 
     shProgram = new ShaderProgram('Basic', prog);
     shProgram.Use();
 
-    shProgram.iAttribVertex              = gl.getAttribLocation(prog, "vertex");
+    shProgram.iAttribVertex = gl.getAttribLocation(prog, "vertex");
     shProgram.iModelViewProjectionMatrix = gl.getUniformLocation(prog, "ModelViewProjectionMatrix");
-    shProgram.iColor                     = gl.getUniformLocation(prog, "color");
+    shProgram.iColor = gl.getUniformLocation(prog, "color");
 
-    surface = new Model('Surface');
-    surface.BufferData(CreateSurfaceData());
+    const surfaceData = CreateSurfaceData();
+
+    surfaceU = new Model('SurfaceU');
+    surfaceU.BufferData(surfaceData.uVertexList);
+
+    surfaceV = new Model('SurfaceV');
+    surfaceV.BufferData(surfaceData.vVertexList);
 
     gl.enable(gl.DEPTH_TEST);
 }
