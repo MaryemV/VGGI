@@ -22,6 +22,15 @@
 <p id="message">Drag your mouse on the cube to rotate it.<br>
 (On a touch screen, you can use your finger.)</p>
 
+<div>
+    <label for="uStepsSlider">U Steps:</label>
+    <input id="uStepsSlider" type="range" min="1" max="100" value="30" oninput="updateSurface()">
+    <span id="uStepsValue">30</span>
+    <label for="vStepsSlider">V Steps:</label>
+    <input id="vStepsSlider" type="range" min="1" max="100" value="30" oninput="updateSurface()">
+    <span id="vStepsValue">30</span>
+</div>
+<br>
 
 <div id="canvas-holder">
    <canvas width="600" height="600" id="webglcanvas" style="background-color:red"></canvas>
